@@ -1,6 +1,18 @@
 import cairo
 import time
 import math
+import random
+
+
+
+# ------------------------------------------------- Helpers -------------------------------------------------
+
+DEBUG_LOG   = False
+DEBUG_SLEEP = False
+
+def log(format, *args):
+    if DEBUG_LOG:
+        print(format, *args)
 
 
 # --------------------------------------------- Data Structures ---------------------------------------------
@@ -115,14 +127,14 @@ class SWAP:
     def execute(self, topology: Topology, mapping: Mapping, swapped_qubits: list[Qubit], circuit: 'Circuit'):
         virtual0  = query_mapping_inverse(mapping, self.edge[0])
         virtual1  = query_mapping_inverse(mapping, self.edge[1])
-        physical0 = mapping[self.edge[1]]
-        physical1 = mapping[self.edge[0]]
+        physical0 = self.edge[1]
+        physical1 = self.edge[0]
         update_mapping(mapping, virtual0, physical0)
         update_mapping(mapping, virtual1, physical1)
         swapped_qubits.append(self.edge[0])
         swapped_qubits.append(self.edge[1])
         circuit.gates.append(Gate("SWAP", [ self.edge[0], self.edge[1] ]))
-        # print("SWAP:", self)
+        log("Executing:", self)
     
 class Gate:
     name: str                  = ""
@@ -268,11 +280,11 @@ def calculate_swap_coefficient(topology: Topology, edge: Edge, q0: Qubit, q1: Qu
     operand_delta = topology.calculate_physical_delta(q0, q1)
     edge_delta = topology.calculate_physical_delta(edge[0], edge[1])
     attraction_force = operand_delta[0] * edge_delta[0] + operand_delta[1] * edge_delta[1]
-    # print("     - Edge " + str(edge[0]) + " -> " + str(edge[1]) + " : " + str(attraction_force))
+    log("     - Edge " + str(edge[0]) + " -> " + str(edge[1]) + " : " + str(attraction_force))
     return attraction_force
 
 def calculate_all_swap_coefficients(swaps: list[SWAP], topology: Topology, mapping: Mapping, q0: Qubit, q1: Qubit):
-    # print(" > Swaps for gate " + str(q0) + " - " + str(q1) + ", mapped to " + str(mapping[q0]) + " - " + str(mapping[q1]))
+    log(" > Swaps for gate " + str(q0) + " - " + str(q1) + ", mapped to " + str(mapping[q0]) + " - " + str(mapping[q1]))
 
     edges = topology.get_edges_with_outgoing_qubit(mapping[q0])
     for edge in edges:
@@ -294,9 +306,9 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
     # Iterate while there are still some unexected gates left
     #
     while circuit.count_unexecuted_gates() > 0:
-        # Debug print the state @Temporary
-        # print("=== Route-Forcing Step ===")
-        # print("Mapping:", mapping)
+        # Debug print the state
+        log("=== Route-Forcing Step ===")
+        log("Mapping:", mapping)
 
         # Execute all gates that can be executed right now
         found_executable_gate, executable_gate = circuit.get_next_executable_gate(topology, mapping)
@@ -316,20 +328,26 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
                     continue
                 
                 calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[0], gate.operands[1])
-                #calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[1], gate.operands[0])
+                calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[1], gate.operands[0])
                         
         # Sort the possible swaps by their coefficient
         swaps.sort(reverse = True, key = lambda e: e.coefficient)
 
-        # print("Sorted", swaps)
-        
+        # Improve the chance of ever converging by randomly exchanging swaps in the list. This is what the
+        # paper proposes...
+        randomness_factor = random.randrange(0, max(len(swaps) // 3, 1))
+        for i in range(0, randomness_factor):
+            my_edge    = random.randrange(0, len(swaps))
+            other_edge = random.randrange(0, len(swaps))
+            swaps[my_edge], swaps[other_edge] = swaps[other_edge], swaps[my_edge]
+            
         # Executable all possible swaps in descending order
         for swap in swaps:
             if swap.is_executable(topology, mapping, swapped_qubits):
                 swap.execute(topology, mapping, swapped_qubits, result)
 
-        # nocheckin
-        # time.sleep(0.5)
+        if DEBUG_SLEEP:
+            time.sleep(0.5)
                 
     return result, dag
     
@@ -581,9 +599,9 @@ def quad_topology():
     circuit = Circuit(
         topology.get_qubits(),
         [
-            Gate("H",    [0]),
+            Gate("H",    [1]),
             Gate("H",    [8]),
-            Gate("CNOT", [0, 8]),
+            Gate("CNOT", [1, 8]),
         ]
     )
 
