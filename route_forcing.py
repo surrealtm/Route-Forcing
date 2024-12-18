@@ -7,8 +7,8 @@ import random
 
 # ------------------------------------------------- Helpers -------------------------------------------------
 
-DEBUG_LOG   = False
-DEBUG_SLEEP = False
+DEBUG_LOG   = True
+DEBUG_SLEEP = True
 
 RANDOMIZE_SWAPS = False # This doesn't fix anything deterministically...
 
@@ -132,7 +132,9 @@ class SWAP:
         return "SWAP(" + str(self.edge) + ", " + str(self.coefficient) + ")"
         
     def is_executable(self, topology: Topology, mapping: Mapping, swapped_qubits: list[Qubit]) -> bool:
-        return not self.edge[0] in swapped_qubits and not self.edge[1] in swapped_qubits and topology.connection_exists(self.edge[0], self.edge[1])
+        # The 'self.coefficient > 0' part is not explicitly mentioned in the paper, but it otherwise we often
+        # get stuck in an infinite loop...
+        return self.coefficient > 0 and not self.edge[0] in swapped_qubits and not self.edge[1] in swapped_qubits and topology.connection_exists(self.edge[0], self.edge[1])
 
     def execute(self, topology: Topology, mapping: Mapping, swapped_qubits: list[Qubit], circuit: 'Circuit'):
         virtual0  = query_mapping_inverse(mapping, self.edge[0])
@@ -638,7 +640,7 @@ def quad_topology():
             Gate("CNOT", [5, 6]),
             Gate("H",    [9]),
             Gate("CNOT", [6, 9]),
-            #Gate("CNOT", [7, 9]),
+            Gate("CNOT", [7, 9]),
         ]
     )
 
