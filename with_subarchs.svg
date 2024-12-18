@@ -76,7 +76,7 @@
 </symbol>
 </g>
 </defs>
-<g id="surface6">
+<g id="surface1">
 <rect x="0" y="0" width="2048" height="1024" style="fill:rgb(100%,100%,100%);fill-opacity:1;stroke:none;"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(0%,0%,0%);stroke-opacity:1;stroke-miterlimit:10;" d="M 0 0.5 L 2 0.5 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(0%,0%,0%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1 0 L 1 0.5 " transform="matrix(1024,0,0,1024,0,0)"/>
@@ -137,26 +137,14 @@
 </g>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.0999985 L 1.099998 0.0722237 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.0999985 L 1.099998 0.116665 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.0999985 L 1.099998 0.0722237 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.0999985 L 1.099998 0.116665 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.200001 L 1.099998 0.16111 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.200001 L 1.099998 0.205555 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.200001 L 1.099998 0.16111 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.200001 L 1.099998 0.205555 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.299999 L 1.099998 0.25 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.299999 L 1.099998 0.294445 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.299999 L 1.099998 0.25 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.299999 L 1.099998 0.294445 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.400002 L 1.099998 0.33889 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.400002 L 1.099998 0.383335 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.400002 L 1.099998 0.33889 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.299999 0.400002 L 1.099998 0.383335 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.5 0.25 L 1.299999 0.400002 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.5 0.25 L 1.299999 0.299999 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.5 0.25 L 1.299999 0.400002 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.5 0.25 L 1.299999 0.299999 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.700001 0.25 L 1.5 0.25 " transform="matrix(1024,0,0,1024,0,0)"/>
-<path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.700001 0.25 L 1.099998 0.427776 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.700001 0.25 L 1.5 0.25 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.005;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(30%,30%,30%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.700001 0.25 L 1.099998 0.427776 " transform="matrix(1024,0,0,1024,0,0)"/>
 <path style="fill:none;stroke-width:0.03;stroke-linecap:butt;stroke-linejoin:miter;stroke:rgb(80%,50%,20%);stroke-opacity:1;stroke-miterlimit:10;" d="M 1.115002 0.0722237 C 1.115002 0.0805054 1.108284 0.0872231 1.099998 0.0872231 C 1.091717 0.0872231 1.084999 0.0805054 1.084999 0.0722237 C 1.084999 0.0639381 1.091717 0.0572205 1.099998 0.0572205 C 1.108284 0.0572205 1.115002 0.0639381 1.115002 0.0722237 " transform="matrix(1024,0,0,1024,0,0)"/>

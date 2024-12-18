@@ -10,6 +10,8 @@ import random
 DEBUG_LOG   = False
 DEBUG_SLEEP = False
 
+RANDOMIZE_SWAPS = False # This doesn't fix anything deterministically...
+
 def log(format, *args):
     if DEBUG_LOG:
         print(format, *args)
@@ -24,11 +26,13 @@ DAG      = dict[int, list['Gate']]
 Vector2  = tuple[float, float]
 
 
-def get_initial_mapping(qubits: list[Qubit]) -> Mapping:
+def get_initial_mapping(virtual_qubits: list[Qubit], physical_qubits: list[Qubit]) -> Mapping:
     mapping: Mapping = {}
+
+    assert(len(virtual_qubits) <= len(physical_qubits))
     
-    for qubit in qubits:
-        mapping[qubit] = qubit
+    for i in range(0, len(virtual_qubits)):
+        mapping[virtual_qubits[i]] = physical_qubits[i]
 
     return mapping
 
@@ -41,6 +45,7 @@ def query_mapping_inverse(mapping: Mapping, physical: Qubit) -> Qubit:
             return virtual
 
     return -1
+
 
 class Topology:
     connections: dict[Qubit, list[Qubit]]
@@ -81,23 +86,28 @@ class Topology:
         return result
     
     def get_qubits(self) -> int:
-        return self.connections.keys()
+        return list(self.connections.keys())
 
     def get_qubit_count(self) -> int:
         return len(self.connections.keys())
 
     def qubit_index(self, qubit: Qubit) -> int:
         keys = list(self.connections.keys())
-        return keys.index(qubit);
+        return keys.index(qubit)
 
-    def get_row_count(self):
-        return max(3, int(math.sqrt(self.get_qubit_count())))
+    def get_topology_row_count(self):
+        qubit_count = max(self.get_qubits()) + 1
+        return max(3, int(math.sqrt(qubit_count)))
+
+    def get_circuit_row_count(self):
+        qubit_count = max(self.get_qubits()) + 1
+        return qubit_count
     
     def get_physical_position(self, qubit) -> Vector2:
-        row_count = self.get_row_count()
-        index     = self.qubit_index(qubit)
-        column    = index % row_count
-        row       = index // row_count
+        row_count = self.get_topology_row_count()
+        index     = qubit
+        column    = index // row_count
+        row       = index % row_count
         return (column, row)
 
     def calculate_physical_delta(self, q0: Qubit, q1: Qubit) -> Vector2:
@@ -207,6 +217,9 @@ class Circuit:
 
         return True, gates[0]
 
+    def get_qubits(self) -> list[Qubit]:
+        return self.qubits
+    
     def count_unexecuted_gates(self) -> int:
         count = 0
 
@@ -276,25 +289,25 @@ def update_swap_coefficient(swaps: list[SWAP], edge: Edge, coefficient: float):
 
     swaps.append(SWAP(edge, coefficient))
 
-def calculate_swap_coefficient(topology: Topology, edge: Edge, q0: Qubit, q1: Qubit) -> float:
+def calculate_swap_coefficient(topology: Topology, edge: Edge, q0: Qubit, q1: Qubit, temporal_distance: float) -> float:
     operand_delta = topology.calculate_physical_delta(q0, q1)
     edge_delta = topology.calculate_physical_delta(edge[0], edge[1])
     attraction_force = operand_delta[0] * edge_delta[0] + operand_delta[1] * edge_delta[1]
     log("     - Edge " + str(edge[0]) + " -> " + str(edge[1]) + " : " + str(attraction_force))
-    return attraction_force
+    return attraction_force * temporal_distance
 
-def calculate_all_swap_coefficients(swaps: list[SWAP], topology: Topology, mapping: Mapping, q0: Qubit, q1: Qubit):
+def calculate_all_swap_coefficients(swaps: list[SWAP], topology: Topology, mapping: Mapping, q0: Qubit, q1: Qubit, temporal_distance: float):
     log(" > Swaps for gate " + str(q0) + " - " + str(q1) + ", mapped to " + str(mapping[q0]) + " - " + str(mapping[q1]))
 
     edges = topology.get_edges_with_outgoing_qubit(mapping[q0])
     for edge in edges:
-        coefficient = calculate_swap_coefficient(topology, edge, mapping[q0], mapping[q1])
+        coefficient = calculate_swap_coefficient(topology, edge, mapping[q0], mapping[q1], temporal_distance)
         update_swap_coefficient(swaps, edge, coefficient)
         
 def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
     result: Circuit = Circuit([], [])
 
-    mapping: Mapping = get_initial_mapping(topology.get_qubits())
+    mapping: Mapping = get_initial_mapping(circuit.get_qubits(), topology.get_qubits())
     
     circuit.reset_execution_state()
     circuit.build_dependencies()
@@ -326,20 +339,22 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
             for gate in gates:
                 if gate.has_been_executed or len(gate.operands) != 2:
                     continue
-                
-                calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[0], gate.operands[1])
-                calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[1], gate.operands[0])
+
+                temporal_distance = 1 / i
+                calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[0], gate.operands[1], temporal_distance)
+                calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[1], gate.operands[0], temporal_distance)
                         
         # Sort the possible swaps by their coefficient
         swaps.sort(reverse = True, key = lambda e: e.coefficient)
 
         # Improve the chance of ever converging by randomly exchanging swaps in the list. This is what the
         # paper proposes...
-        randomness_factor = random.randrange(0, max(len(swaps) // 3, 1))
-        for i in range(0, randomness_factor):
-            my_edge    = random.randrange(0, len(swaps))
-            other_edge = random.randrange(0, len(swaps))
-            swaps[my_edge], swaps[other_edge] = swaps[other_edge], swaps[my_edge]
+        if RANDOMIZE_SWAPS:
+            randomness_factor = random.randrange(0, max(len(swaps) // 3, 1))
+            for i in range(0, randomness_factor):
+                my_edge    = random.randrange(0, len(swaps))
+                other_edge = random.randrange(0, len(swaps))
+                swaps[my_edge], swaps[other_edge] = swaps[other_edge], swaps[my_edge]
             
         # Executable all possible swaps in descending order
         for swap in swaps:
@@ -357,7 +372,7 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
 
 def get_topology_qubit_position(topology: Topology, qubit: Qubit) -> (float, float):
     qubit_offset = 0.02
-    qubit_gap    = (0.45 - qubit_offset * 2) / (topology.get_row_count() - 1)
+    qubit_gap    = (0.45 - qubit_offset * 2) / (topology.get_topology_row_count() - 1)
 
     position = topology.get_physical_position(qubit)
     
@@ -365,7 +380,7 @@ def get_topology_qubit_position(topology: Topology, qubit: Qubit) -> (float, flo
 
 def get_circuit_qubit_position(topology: Topology, circuit: Circuit, qubit_index: int, gate_index: int) -> (float, float):
     vertical_qubit_offset = 0.02
-    vertical_qubit_gap    = (0.45 - vertical_qubit_offset * 2) / topology.get_qubit_count()
+    vertical_qubit_gap    = (0.45 - vertical_qubit_offset * 2) / topology.get_circuit_row_count()
 
     horizontal_gate_offset = 0.05
     horizontal_gate_gap    = (2 - horizontal_gate_offset * 2) / (circuit.get_depth() + 1)
@@ -459,9 +474,9 @@ def draw(topology: Topology, dag: DAG, mapped_circuit: Circuit, output_name: str
         context.stroke()
 
     # Draw all qubits
-    for i in range(0, len(topology.connections)):
-        x, y = get_topology_qubit_position(topology, i)
-        draw_qubit(context, x, y, i)
+    for qubit in topology.get_qubits():
+        x, y = get_topology_qubit_position(topology, qubit)
+        draw_qubit(context, x, y, qubit)
 
 
         
@@ -509,9 +524,9 @@ def draw(topology: Topology, dag: DAG, mapped_circuit: Circuit, output_name: str
     #
 
     # Draw all qubits
-    for i in range(0, len(topology.connections)):
-        qx, qy = get_circuit_qubit_position(topology, mapped_circuit, i + 1, 0)
-        ex, ey = get_circuit_qubit_position(topology, mapped_circuit, i + 1, mapped_circuit.get_depth() + 1)
+    for qubit in topology.get_qubits():
+        qx, qy = get_circuit_qubit_position(topology, mapped_circuit, qubit + 1, 0)
+        ex, ey = get_circuit_qubit_position(topology, mapped_circuit, qubit + 1, mapped_circuit.get_depth() + 1)
 
         context.set_source_rgb(0.3, 0.3, 0.3)
         context.set_line_width(0.005)
@@ -519,7 +534,7 @@ def draw(topology: Topology, dag: DAG, mapped_circuit: Circuit, output_name: str
         context.line_to(ex, ey)
         context.stroke()
 
-        draw_qubit(context, qx, qy, i)
+        draw_qubit(context, qx, qy, qubit)
         
     # Draw all gates
     for i in range(0, mapped_circuit.get_depth()):
@@ -560,11 +575,18 @@ def draw(topology: Topology, dag: DAG, mapped_circuit: Circuit, output_name: str
 # ------------------------------------------- Testing Entry Point -------------------------------------------
 
 def execute_comparison(topology: Topology, circuit: Circuit, name: str):
-    # with_subarchs = sub_architecture_based_route_forcing(circuit, topology, sub_arch_size = 3)
-    # draw(topology, with_subarchs, name + "_with_subarchs")
+    with_start = time.perf_counter()
+    with_subarchs, dag = route_forcing(circuit, topology) # @Incomplete: Obviously
+    with_end = time.perf_counter()
+    draw(topology, dag, with_subarchs, "with_subarchs")
+    print("With:    " + str(with_end - with_start) + "s.")
 
+    without_start = time.perf_counter()
     without_subarchs, dag = route_forcing(circuit, topology)
+    without_end = time.perf_counter()
     draw(topology, dag, without_subarchs, "without_subarchs")
+    print("Without: " + str(without_end - without_start) + "s.")
+    
 
 def three_topology():
     topology = Topology({
@@ -586,22 +608,37 @@ def three_topology():
 def quad_topology():
     topology = Topology({
         0: [1, 3],
-        1: [0, 2, 4],
+        1: [0, 2],
         2: [1, 5],
-        3: [0, 4, 6],
-        4: [1, 3, 5, 7],
-        5: [2, 4, 8],
-        6: [3, 7],
-        7: [4, 6, 8],
+        3: [0, 6],
+        5: [2, 8],
+        6: [3, 7, 9],
+        7: [6, 8, 9],
         8: [5, 7],
+        9: [6, 7],
     })
     
     circuit = Circuit(
         topology.get_qubits(),
         [
             Gate("H",    [1]),
+            Gate("H",    [2]),
+            Gate("CNOT", [1, 2]),
+
+            Gate("H",    [0]),
+            Gate("H",    [3]),
+            Gate("CNOT", [0, 3]),
+
+            Gate("H",    [6]),
+            Gate("H",    [7]),
+            Gate("CNOT", [6, 7]),            
+            Gate("H",    [5]),
             Gate("H",    [8]),
-            Gate("CNOT", [1, 8]),
+            Gate("CNOT", [5, 8]),
+            Gate("CNOT", [5, 6]),
+            Gate("H",    [9]),
+            Gate("CNOT", [6, 9]),
+            #Gate("CNOT", [7, 9]),
         ]
     )
 
