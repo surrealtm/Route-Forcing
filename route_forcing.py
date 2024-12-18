@@ -3,12 +3,14 @@ import time
 import math
 import random
 
+from mqt.qmap import subarchitectures
+from mqt.qmap import pyqmap
 
 
 # ------------------------------------------------- Helpers -------------------------------------------------
 
-DEBUG_LOG   = True
-DEBUG_SLEEP = True
+DEBUG_LOG   = False
+DEBUG_SLEEP = False
 
 RANDOMIZE_SWAPS = False # This doesn't fix anything deterministically...
 
@@ -367,7 +369,31 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
             time.sleep(0.5)
                 
     return result, dag
+
+
+
+# --------------------------------------------- Subarchitectures ---------------------------------------------
+
+def load_subarchitecture_order(topology: Topology):
+    coupling_map: set[tuple[int, int]] = set([ (edge[0], edge[1]) for edge in topology.get_edges() ])
+    qmap_architecture = pyqmap.Architecture(len(topology.get_qubits()), coupling_map)
+    return subarchitectures.SubarchitectureOrder.from_qmap_architecture(qmap_architecture)
+
+def route_forcing_with_subarchitectures(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
+    subarchitecture_size = len(topology.get_qubits()) / 2 - 2
+
+    subarchitecture_order = load_subarchitecture_order(topology)
+    subarchitecture_list  = subarchitecture_order.optimal_candidates(subarchitecture_size)
+
+    print("Working with " + str(len(subarchitecture_list)) + " subarchs.")
     
+    figures = subarchitecture_order.draw_subarchitectures(subarchitecture_list)
+    for i in range(0, len(figures)):
+        figure = figures[i]
+        figure.savefig("subarchitecture_" + str(i) + ".png")
+    
+    return route_forcing(circuit, topology)
+
 
 
 # ---------------------------------------------- Visualization ----------------------------------------------
@@ -578,7 +604,7 @@ def draw(topology: Topology, dag: DAG, mapped_circuit: Circuit, output_name: str
 
 def execute_comparison(topology: Topology, circuit: Circuit, name: str):
     with_start = time.perf_counter()
-    with_subarchs, dag = route_forcing(circuit, topology) # @Incomplete: Obviously
+    with_subarchs, dag = route_forcing_with_subarchitectures(circuit, topology)
     with_end = time.perf_counter()
     draw(topology, dag, with_subarchs, "with_subarchs")
     print("With:    " + str(with_end - with_start) + "s.")
@@ -613,6 +639,7 @@ def quad_topology():
         1: [0, 2],
         2: [1, 5],
         3: [0, 6],
+        4: [],
         5: [2, 8],
         6: [3, 7, 9],
         7: [6, 8, 9],
