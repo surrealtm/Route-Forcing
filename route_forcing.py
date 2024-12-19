@@ -2,22 +2,34 @@ import cairo
 import time
 import math
 import random
+import copy
 
 from mqt.qmap import subarchitectures
 from mqt.qmap import pyqmap
+from itertools import combinations
 
 
 # ------------------------------------------------- Helpers -------------------------------------------------
 
-DEBUG_LOG   = False
-DEBUG_SLEEP = False
+DEBUG_LOG   = True
+DEBUG_SLEEP = True
+DEBUG_LOG_INDENT = 0
 
 RANDOMIZE_SWAPS = False # This doesn't fix anything deterministically...
 
 def log(format, *args):
+    global DEBUG_LOG
+    global DEBUG_LOG_INDENT
+    
     if DEBUG_LOG:
-        print(format, *args)
+        print(" " * DEBUG_LOG_INDENT + format, *args)
 
+def log_indent(delta):
+    global DEBUG_LOG
+    global DEBUG_LOG_INDENT
+
+    DEBUG_LOG_INDENT += delta
+        
 
 # --------------------------------------------- Data Structures ---------------------------------------------
 
@@ -51,12 +63,24 @@ def query_mapping_inverse(mapping: Mapping, physical: Qubit) -> Qubit:
 
 class Topology:
     connections: dict[Qubit, list[Qubit]]
-
+    
     def __init__(self, connections: dict[Qubit, list[Qubit]]):
         self.connections = connections
 
-    def connection_exists(self, q0: Qubit, q1: Qubit) -> bool:
-        return q1 in self.connections[q0]
+    def set_from_subarch(self, qubits: list[Qubit], edges: list[Qubit]):
+        self.connections = {}
+        for qubit in qubits:
+            self.connections[qubit] = []
+
+        for edge in edges:
+            if not edge[0] in self.connections[edge[1]]:
+                self.connections[edge[1]].append(edge[0])
+
+            if not edge[1] in self.connections[edge[0]]:
+                self.connections[edge[0]].append(edge[1])
+
+    def edge_exists(self, q0: Qubit, q1: Qubit) -> bool:
+        return (q0, q1) in self.get_edges() or (q1, q0) in self.get_edges()
 
     def get_edges(self) -> list[Edge]:
         result: list[Edge] = []
@@ -68,7 +92,7 @@ class Topology:
 
                 if (not edge0 in result and not edge1 in result):
                     result.append(edge0)
-        
+                
         return result
 
     def get_edges_with_outgoing_qubit(self, qubit: Qubit) -> list[Edge]:
@@ -87,7 +111,7 @@ class Topology:
         
         return result
     
-    def get_qubits(self) -> int:
+    def get_qubits(self) -> list[Qubit]:
         return list(self.connections.keys())
 
     def get_qubit_count(self) -> int:
@@ -128,15 +152,15 @@ class SWAP:
         self.coefficient = coefficient
 
     def __str__(self):
-        return "[ " + str(self.edge[0]) + " <-> " + str(self.edge[1]) + " (" + str(self.coefficient) + ") ]"
+        return "[ SWAP: " + str(self.edge[0]) + ", " + str(self.edge[1]) + " (" + str(self.coefficient) + ") ]"
 
     def __repr__(self):
-        return "SWAP(" + str(self.edge) + ", " + str(self.coefficient) + ")"
+        return self.__str__()
         
     def is_executable(self, topology: Topology, mapping: Mapping, swapped_qubits: list[Qubit]) -> bool:
         # The 'self.coefficient > 0' part is not explicitly mentioned in the paper, but it otherwise we often
         # get stuck in an infinite loop...
-        return self.coefficient > 0 and not self.edge[0] in swapped_qubits and not self.edge[1] in swapped_qubits and topology.connection_exists(self.edge[0], self.edge[1])
+        return self.coefficient >= 0 and not self.edge[0] in swapped_qubits and not self.edge[1] in swapped_qubits and topology.edge_exists(*self.edge)
 
     def execute(self, topology: Topology, mapping: Mapping, swapped_qubits: list[Qubit], circuit: 'Circuit'):
         virtual0  = query_mapping_inverse(mapping, self.edge[0])
@@ -161,6 +185,12 @@ class Gate:
         self.operands          = operands
         self.dependencies      = []
         self.has_been_executed = False
+
+    def __str__(self):
+        return "[ " + self.name + ": " + ", ".join(str(q) for q in self.operands) + " ]"
+
+    def __repr__(self):
+        return self.__str__()
 
     def all_dependencies_executed(self) -> bool:
         result = True
@@ -204,7 +234,7 @@ class Circuit:
             if len(gate.operands) == 1:
                 executable = True
             elif len(gate.operands) == 2:
-                executable = topology.connection_exists(mapping[gate.operands[0]], mapping[gate.operands[1]])
+                executable = topology.edge_exists(mapping[gate.operands[0]], mapping[gate.operands[1]])
             else:
                 print("A gate was expected to have either 1 or 2 operands, not '" + str(len(gate.operands)) + "'!", file=sys.stderr)
 
@@ -297,16 +327,19 @@ def calculate_swap_coefficient(topology: Topology, edge: Edge, q0: Qubit, q1: Qu
     operand_delta = topology.calculate_physical_delta(q0, q1)
     edge_delta = topology.calculate_physical_delta(edge[0], edge[1])
     attraction_force = operand_delta[0] * edge_delta[0] + operand_delta[1] * edge_delta[1]
-    log("     - Edge " + str(edge[0]) + " -> " + str(edge[1]) + " : " + str(attraction_force))
+    log("- Edge " + str(edge[0]) + " -> " + str(edge[1]) + " : " + str(attraction_force))
     return attraction_force * temporal_distance
 
 def calculate_all_swap_coefficients(swaps: list[SWAP], topology: Topology, mapping: Mapping, q0: Qubit, q1: Qubit, temporal_distance: float):
-    log(" > Swaps for gate " + str(q0) + " - " + str(q1) + ", mapped to " + str(mapping[q0]) + " - " + str(mapping[q1]))
-
+    log("> Swaps for gate " + str(q0) + " - " + str(q1) + ", mapped to " + str(mapping[q0]) + " - " + str(mapping[q1]))
+    log_indent(2)
+    
     edges = topology.get_edges_with_outgoing_qubit(mapping[q0])
     for edge in edges:
         coefficient = calculate_swap_coefficient(topology, edge, mapping[q0], mapping[q1], temporal_distance)
         update_swap_coefficient(swaps, edge, coefficient)
+
+    log_indent(-2)
         
 def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
     result: Circuit = Circuit([], [])
@@ -316,7 +349,6 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
     circuit.reset_execution_state()
     circuit.build_dependencies()
     dag = circuit.build_dag_for_drawing()
-    
     dag_depth = circuit.get_dag_depth()
 
     #
@@ -325,6 +357,7 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
     while circuit.count_unexecuted_gates() > 0:
         # Debug print the state
         log("=== Route-Forcing Step ===")
+        log_indent(4)
         log("Mapping:", mapping)
 
         # Execute all gates that can be executed right now
@@ -332,6 +365,7 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
         while found_executable_gate:
             executable_gate.has_been_executed = True
             result.gates.append(Gate(executable_gate.name, [ mapping[operand] for operand in executable_gate.operands ]))
+            log("Executing: " + str(executable_gate))
             found_executable_gate, executable_gate = circuit.get_next_executable_gate(topology, mapping)
 
         # Look ahead in the DAG to assign a swap coefficient to all possible swaps
@@ -344,7 +378,7 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
                 if gate.has_been_executed or len(gate.operands) != 2:
                     continue
 
-                temporal_distance = 1 / i
+                temporal_distance = 1 / (i + 1)
                 calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[0], gate.operands[1], temporal_distance)
                 calculate_all_swap_coefficients(swaps, topology, mapping, gate.operands[1], gate.operands[0], temporal_distance)
                         
@@ -365,6 +399,8 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
             if swap.is_executable(topology, mapping, swapped_qubits):
                 swap.execute(topology, mapping, swapped_qubits, result)
 
+        log_indent(-4)
+
         if DEBUG_SLEEP:
             time.sleep(0.5)
                 
@@ -374,25 +410,80 @@ def route_forcing(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
 
 # --------------------------------------------- Subarchitectures ---------------------------------------------
 
-def load_subarchitecture_order(topology: Topology):
-    coupling_map: set[tuple[int, int]] = set([ (edge[0], edge[1]) for edge in topology.get_edges() ])
-    qmap_architecture = pyqmap.Architecture(len(topology.get_qubits()), coupling_map)
-    return subarchitectures.SubarchitectureOrder.from_qmap_architecture(qmap_architecture)
 
-def route_forcing_with_subarchitectures(circuit: Circuit, topology: Topology) -> (Circuit, DAG):
-    subarchitecture_size = len(topology.get_qubits()) / 2 - 2
-
-    subarchitecture_order = load_subarchitecture_order(topology)
-    subarchitecture_list  = subarchitecture_order.optimal_candidates(subarchitecture_size)
-
-    print("Working with " + str(len(subarchitecture_list)) + " subarchs.")
+def generate_non_isomorphic_subarchitectures(topology: Topology, size: int) -> list[Topology]:
+    result: list[Topology] = []
+    qubits: list[Qubit] = topology.get_qubits()
     
-    figures = subarchitecture_order.draw_subarchitectures(subarchitecture_list)
-    for i in range(0, len(figures)):
-        figure = figures[i]
-        figure.savefig("subarchitecture_" + str(i) + ".png")
+    for sub_qubits in combinations(qubits, size):
+        sub_qubits = list(sub_qubits)
+        sub_edges: list[Edge] = list(combinations(sub_qubits, 2))
+        possible_sub_edges: list[Edge] = [ edge for edge in sub_edges if topology.edge_exists(*edge) ]
+        subarch = Topology({})
+        subarch.set_from_subarch(sub_qubits, possible_sub_edges)
+        result.append(subarch)
+
+    return result
+
+def greedy_select_subarchitectures(subarchitectures: list[Topology], number_of_candidates: int) -> list[Topology]:
+    scores   = [ len(arch.get_edges()) for arch in subarchitectures ]
+    ranked   = sorted(zip(subarchitectures, scores), key = lambda x: x[1], reverse = True)
+    selected = [ arch for arch, _ in ranked[:number_of_candidates]]
+    return selected
+
+def partition_circuit(subarchitectures: list[Topology], circuit: Circuit) -> (list[tuple[Circuit, Topology]], Circuit):
+    remaining_circuit = copy.deepcopy(circuit)
+    result: list[tuple[Circuit, Topology]] = []
     
-    return route_forcing(circuit, topology)
+    for arch in subarchitectures:
+        qubits: list[Qubit] = arch.get_qubits()
+        gates: list[Gate] = [ gate for gate in remaining_circuit.gates if set(gate.operands).issubset(set(qubits)) ]
+        if len(gates) == 0:
+            continue
+
+        for gate in gates:
+            remaining_circuit.gates.remove(gate)
+
+        log("Creating subcircuit: " + str(qubits) + ", " + str(gates))
+        result.append((Circuit(qubits, gates), arch))
+
+    return result, remaining_circuit
+
+def integrate_subcircuits(subcircuits: list[Circuit], remaining_circuit: Circuit, topology: Topology) -> (Circuit, DAG):
+    global_circuit = Circuit(topology.get_qubits(), [])
+
+    for subcircuit in subcircuits:
+        global_circuit.gates.extend(subcircuit.gates)
+
+    remaining_circuit, remaining_dag = route_forcing(remaining_circuit, topology)
+    global_circuit.gates.extend(remaining_circuit.gates)
+
+    global_circuit.reset_execution_state()
+    global_circuit.build_dependencies()
+    global_dag = global_circuit.build_dag_for_drawing()
+    
+    return global_circuit, global_dag
+
+def route_forcing_with_subarchitectures(circuit: Circuit, topology: Topology, subarchitecture_size: int) -> (Circuit, DAG):
+    subarchitectures: list[Topology] = greedy_select_subarchitectures(generate_non_isomorphic_subarchitectures(topology, subarchitecture_size), len(circuit.qubits))
+    subproblems, remaining_circuit = partition_circuit(subarchitectures, circuit)
+
+    mapped_subproblems: list[Circuit] = []
+    for subcircuit, subarch in subproblems:
+        log(">>>>> Mapping subcircuit...")
+        log_indent(4)
+        log("CircGates:  " + str(subcircuit.gates))
+        log("CircQubits:  " + str(subcircuit.get_qubits()))
+        log("ArchQubits: " + str(subarch.get_qubits()))
+        log("ArchEdges: " + str(subarch.get_edges()))
+        mapped_circuit, dag = route_forcing(subcircuit, subarch)
+        mapped_subproblems.append(mapped_circuit)
+        log_indent(-4)
+        log("<<<<< Mapped subcircuit.")
+
+    global_circuit, global_dag = integrate_subcircuits(mapped_subproblems, remaining_circuit, topology)
+
+    return global_circuit, global_dag
 
 
 
@@ -604,7 +695,7 @@ def draw(topology: Topology, dag: DAG, mapped_circuit: Circuit, output_name: str
 
 def execute_comparison(topology: Topology, circuit: Circuit, name: str):
     with_start = time.perf_counter()
-    with_subarchs, dag = route_forcing_with_subarchitectures(circuit, topology)
+    with_subarchs, dag = route_forcing_with_subarchitectures(circuit, topology, 3)
     with_end = time.perf_counter()
     draw(topology, dag, with_subarchs, "with_subarchs")
     print("With:    " + str(with_end - with_start) + "s.")
@@ -618,17 +709,14 @@ def execute_comparison(topology: Topology, circuit: Circuit, name: str):
 
 def three_topology():
     topology = Topology({
-        0: [1, 3],
-        1: [0, 2, 4],
-        2: [1, 5],
-        3: [0, 4],
-        4: [1, 3, 5],
-        5: [2, 4],
+        0: [1],
+        1: [0, 2],
+        2: [1],
     })
 
     circuit = Circuit(
         topology.get_qubits(),
-        [ Gate("CNOT", [0, 5]) ]
+        [ Gate("CNOT", [0, 2]) ]
     )
 
     execute_comparison(topology, circuit, "three")
